@@ -1,0 +1,53 @@
+name: Testing and deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  integrationtests:
+    runs-on: ubuntu-latest
+    env:
+      MYSQL_ROOT_PASSWORD: root # default root password to use must be 'root'
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: share_a_meal
+      DB_USER: root
+      DB_PASSWORD: root
+    services:
+      mysql:
+        image: mysql:5.7
+        ports:
+          - 3306
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Start MySQL connection from host
+        run: |
+          sudo /etc/init.d/mysql start
+          sudo apt-get install -y mysql-client
+          mysql -uroot -p${{ env.MYSQL_ROOT_PASSWORD }} -e "SHOW DATABASES;"
+          mysql -uroot -p${{ env.MYSQL_ROOT_PASSWORD }} -e "CREATE DATABASE ${{env.DB_DATABASE}};"
+      - name: Import database script
+        run: |
+          mysql -uroot -p${{env.MYSQL_ROOT_PASSWORD}} ${{env.DB_DATABASE}} < share-a-meal.sql
+          mysql -uroot -p${{env.MYSQL_ROOT_PASSWORD}} ${{env.DB_DATABASE}} -e "SHOW TABLES;"
+      - name: npm install
+        run: |
+          npm install
+      - name: npm test
+        run: |
+          npm test -- --DB_PASSWORD $MYSQL_ROOT_PASSWORD --DB_USER root --DB_NAME $DB_DATABASE
+    # Heroku-deploy:
+    #   needs: integrationtests
+    #   runs-on: ubuntu-latest
+    #   environment:
+    #     name: programmeren 4
+    #   steps:
+    #     - uses: actions/checkout@v2
+    #     - uses: akhileshns/heroku-deploy@v3.12.12
+    #       with:
+    #         heroku_api_key: ${{secrets.HEROKU_API_KEY}}
+    #         heroku_app_name: shareameal-prog4
+    #         heroku_email: ${{secrets.HEROKU_USER_EMAIL}}
